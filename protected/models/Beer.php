@@ -1,8 +1,5 @@
 <?php
 
-const NO_BEER_FOUND = 'no beer found';
-const PAGE_OUT_OF_RANGE = 'page out of range';
-
 class Beer extends ActiveRecord
 {
     public static function model($className = __CLASS__)
@@ -120,61 +117,6 @@ class Beer extends ActiveRecord
 			$beerMalt->delete();
 		}
 	}
-
-    /** Find all beers or use a search query to find based on beer name.
-     * The results are chunked based on $pagesize.
-     * We can return one specific page with the $page param.
-     *
-     * @param string $query a beer name to search for.
-     * @param int    $pagesize the number of results to include in one page.
-     * @param int    $page the specific page we want to return.
-     * @return array|false an array of beers or false if the pagination params are invalid here.
-     */
-    public function findBeersByName($query = '', $pagesize = 10, $page = 1)
-    {
-        if ($query) {
-            // Case insensitive search.
-            $c = new CDbCriteria();
-            $c->addSearchCondition('name', $query);
-            $beers = Beer::findAll($c);
-        } else {
-            $beers = Beer::findAll();
-        }
-        // Do some pagination for when we have a lot of results.
-        $paginatedbeers = array_chunk($beers, $pagesize);
-        if (empty($paginatedbeers)) {
-            return NO_BEER_FOUND;
-        }
-        if (isset($paginatedbeers[$page - 1])) {
-            return array_chunk($beers, $pagesize)[$page - 1];
-        }
-        // We found beers but the page given is outside the range.
-        return PAGE_OUT_OF_RANGE;
-    }
-
-    /**
-     * Check if the given params are correctly formed and otherwise sane.
-     *
-     * @return string|bool false if the params are ok, a string containing an error message otherwise.
-     */
-    public function checkParams($query, $pagesize, $page) {
-        // Return a detailed error message when we've given incorrect params.
-        $error = false;
-
-        // First check pagesize.
-        if (!is_numeric($pagesize)) {
-            $error .= "Pagesize must be a number\n";
-        } else if ($pagesize < 1) {
-            $error .= "Pagesize must be greater than zero.\n";
-        }
-        // Check page.
-        if (!is_numeric($page)) {
-            $error .= "Page must be a number.\n";
-        } else if ($page < 1) {
-            $error .= "Page must be greater than zero.\n";
-        }
-        return $error;
-    }
 
     public function rules()
     {

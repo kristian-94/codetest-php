@@ -1,29 +1,59 @@
 <?php
 
+const PAGESIZE_DEFAULT = 10;
+const PAGE_DEFAULT = 1;
+
 class ApiController extends CController
 {
+    /**
+     * Check if the given request page params are correctly formed and otherwise sane.
+     *
+     * @param int $pagesize number of items on each page.
+     * @param int $page specific page we want to fetch.
+     * @return string|bool false if the params are ok, a string containing an error message otherwise.
+     */
+    private function checkPageParams($pagesize = 10, $page = 1) {
+        // Return a detailed error message when we've given incorrect params.
+        $error = false;
+
+        // First check pagesize.
+        if (!is_numeric($pagesize)) {
+            $error .= "Pagesize must be a number\n";
+        } else if ($pagesize < 1) {
+            $error .= "Pagesize must be greater than zero.\n";
+        }
+        // Check page.
+        if (!is_numeric($page)) {
+            $error .= "Page must be a number.\n";
+        } else if ($page < 1) {
+            $error .= "Page must be greater than zero.\n";
+        }
+        return $error;
+    }
     // Actions
     public function actionFetch()
     {
         // Get a search query and other pagination params if they exist.
         $query = isset($_GET['query']) ? $_GET['query'] : '';
-        $pagesize = isset($_GET['pagesize']) ? $_GET['pagesize'] : 10;
-        $page = isset($_GET['page']) ? $_GET['page'] : 1;
+        $pagesize = isset($_GET['pagesize']) ? $_GET['pagesize'] : PAGESIZE_DEFAULT;
+        $page = isset($_GET['page']) ? $_GET['page'] : PAGE_DEFAULT;
 
-        $paramscheck = Beer::model()->checkParams($query, $pagesize, $page);
-        if ($paramscheck !== false) {
-            $this->_sendResponse(400, "Incorrect params given: \n" . $paramscheck);
+        $paramscheckerror = self::checkPageParams($pagesize, $page);
+        if ($paramscheckerror !== false) {
+            $this->_sendResponse(400, "Incorrect params given: \n" . $paramscheckerror);
         }
 
-        $beers = Beer::model()->findBeersByName($query, $pagesize, $page);
-        if ($beers === NO_BEER_FOUND) {
-            // Not found.
+        $results = BeerViewModel::search($query);
+        if (!$results) {
             $this->_sendResponse(200, 'No beers found matching your query');
-        } else if ($beers === PAGE_OUT_OF_RANGE) {
+        }
+
+        $paginatedresults = Pagination::paginate($results, $pagesize, $page);
+        if ($paginatedresults === PAGE_OUT_OF_RANGE) {
             // 406 Not Acceptable for page being outside the range - the server cannot produce a matching response.
             $this->_sendResponse(406);
         }
-        $this->_sendResponse(200, CJSON::encode($beers), 'application/json');
+        $this->_sendResponse(200, CJSON::encode($paginatedresults), 'application/json');
     }
     public function actionUpdate()
     {
@@ -74,7 +104,7 @@ class ApiController extends CController
             switch($status)
             {
                 case 406:
-                    $message = 'Found beers but your requested page was outside the range.';
+                    $message = 'Found data but your requested page was outside the range.';
                     break;
                 case 400:
                     $message = 'Your request params are malformed or otherwise incorrect.';
